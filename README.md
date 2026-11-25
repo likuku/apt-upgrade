@@ -6,7 +6,7 @@
 - **自动化执行**：
  - 每次启动检查 apt_upgrade 创建 apt_upgrade.log 文件，若已有，直接清空此文件
  - apt update -y && apt full-upgrade -y
- - 检查 apt full-upgrade -y 的输出日志，假若软件包更新涉及 (不区分大小写) liux kernel,linux image,ssl,ssh,nginx 等需要 reboot 的则 执行 reboot
+ - 检查 apt full-upgrade -y 的输出日志，假若软件包更新涉及 (不区分大小写) linux kernel,linux image,ssl,ssh,nginx 等需要 reboot 的则 执行 reboot
  - 指令执行的显示信息，都输出到标准输出，并同时追加写入 apt_upgrade.log ，行首附带时间戳，使用 UTC 时区，时间戳结尾标明 UTC
 - **处理进度与状态显示**：处理过程中，控制台实时显示带有运行状态转圈动画（如 `⠋`）
 
@@ -24,9 +24,9 @@
   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o apt_upgrade_linux_arm64 src/main.go
   ```
 
-# Go 模块文件说明 (`go.mod` 与 `go.sum`)
-- **`go.mod`**：定义模块名称（`apt_upgrade`）及声明外部依赖（如 `github.com/rwcarlsen/goexif` 和 `golang.org/x/image`）。
-- **`go.sum`**：记录所有依赖包及其特定版本的加密校验和（Cryptographic Checksums），用于防止依赖被篡改并确保团队与 CI 构建的一致性。
+# Go 模块文件说明 (`go.mod`)
+- **`go.mod`**：定义模块名称（`apt_upgrade`）与 Go 版本（1.27）。
+- 本项目只使用标准库，没有外部依赖，因此不需要 `go.sum`。
 
 ## 已实现功能（2026-11-25）
 - 目录结构：
@@ -43,6 +43,14 @@
   5. 命令输出与状态信息同时写入标准输出和 `apt_upgrade.log`，每行行首为 UTC 时间戳、行尾标注 `UTC`
 - 转圈动画：只写入当前控制终端 `/dev/tty`，不写入日志、标准输出或标准错误；无终端时自动跳过。
 - 命令执行时设置 `DEBIAN_FRONTEND=noninteractive`，避免交互提示阻塞升级。
+
+## 安全与隐私措施（2026-11-25）
+- 命令使用绝对路径：优先 `/usr/bin/apt` 与 `/usr/sbin/reboot`，避免 root 运行时被篡改的 `PATH` 劫持。
+- 子进程环境最小化：只传递固定的安全 `PATH`、`LANG=C.UTF-8`、`DEBIAN_FRONTEND=noninteractive`，不继承 root 的其他环境变量。
+- 日志文件权限为 `0600`，且用 `O_NOFOLLOW` 拒绝符号链接，防止信息泄露和链接劫持。
+- 写入日志前脱敏 URL 中的用户名、密码或令牌（替换为 `***`）。
+- 交叉编译产物不纳入版本控制，验证后应从工作目录删除，避免被替换后以 root 运行。
+- 仓库文件统一使用 `0644` 权限，目录使用 `0755`，避免同组用户随意修改源码。
 
 ## 运行与测试
 ```bash
